@@ -15,15 +15,25 @@ export async function runAgent(
     conversationHistory: ModelMessage[],
     callbacks: AgentCallbacks,
 ): Promise<any> {
+    // Filter and check if we need to compact the conversation
     const {text, toolCalls} = await generateText({
         model: openai(MODEL_NAME),
         prompt: userMessage,
         system: SYSTEM_PROMPT,
         tools,
+        toolChoice: 'none', // default: 'auto'... other choices: 'none', name of tool, etc.
         stopWhen: stepCountIs(2),
     });
 
-    console.log(text, toolCalls);
+    toolCalls.forEach(async (toolCall) => {
+        const result = await executeTool(
+            toolCall.toolName,
+            toolCall.input as Record<string, unknown>,
+        );
+        console.log(result);
+    });
+
+    console.log(text);
 };
 
 runAgent("what is the current time?", []);
