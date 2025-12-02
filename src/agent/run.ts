@@ -16,13 +16,15 @@ export async function runAgent(
     callbacks: AgentCallbacks,
 ): Promise<any> {
     // Filter and check if we need to compact the conversation
+
+    // The following call is actually what creates the agent.
     const {text, toolCalls} = await generateText({
         model: openai(MODEL_NAME),
         prompt: userMessage,
         system: SYSTEM_PROMPT,
         tools,
         toolChoice: 'none', // default: 'auto'... other choices: 'none', name of tool, etc.
-        stopWhen: stepCountIs(2),
+        stopWhen: stepCountIs(2),   // (1) didn't return the answer.
     });
 
     toolCalls.forEach(async (toolCall) => {
