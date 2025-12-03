@@ -1,4 +1,4 @@
-// import 'dotenv/config';
+import 'dotenv/config';
 
 import {streamText, uiMessageChunkSchema, type ModelMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';  

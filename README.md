@@ -62,9 +62,17 @@ Creating loop in src/agent/run.ts -- look up chain of reasoning, for different t
 
 ## LESSON 05 NOTES: Multiturn Evals
 
+There might be some discrepancies in the agent's code itself; will need to check.
+This lesson basically shows how to eval multiple steps -- whether conversation between user and LLM is appropriately done. Also, the concept of LLM-as-judge.
+
+### New and updated files:
 evals/executors.ts
 evals/executors.ts
 
+
+## LESSON 06: File System Tools
+
+For enabling the agent to use system tools.
 
 [Scott's original notes](https://publish.obsidian.md/agents-v2/course)
 
