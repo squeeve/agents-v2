@@ -8,6 +8,14 @@ import {executeTool} from "./executeTool.ts";
 import { SYSTEM_PROMPT } from './system/prompt.ts';
 
 import type {AgentCallbacks, ToolCallInfo} from '../types.ts';
+import {
+    estimateMessagesTokens,
+    getModelLimits,
+    isOverThreshold,
+    calculateUsagePercentage,
+    compactConversation,
+    DEFAULT_THRESHOLD
+} from './context/index.ts'
 import {filterCompatibleMessages} from "./system/filterMessages.ts";
 
 const MODEL_NAME = "gpt-5-mini";
@@ -20,9 +28,10 @@ export async function runAgent(
     conversationHistory: ModelMessage[],
     callbacks: AgentCallbacks,
 ): Promise<ModelMessage[]> {
+    const modelLimits = getModelLimits(MODEL_NAME);
     const workingHistory = filterCompatibleMessages(conversationHistory);
 
-    const messages: ModelMessage[] = [
+    let messages: ModelMessage[] = [
         {
             role: "system",
             content: SYSTEM_PROMPT
@@ -31,7 +40,13 @@ export async function runAgent(
         {role: 'user', content: userMessage},
     ];
 
+    const precheckTokens = estimateMessagesTokens(messages);
+    if (isOverThreshold(precheckTokens.total, modelLimits.contextWindow)) {
+        messages = await compactConversation(workingHistory, MODEL_NAME);
+    }
+
     let fullResponse = "";
+
     while (true) {
         const result = streamText({
             model: openai(MODEL_NAME),
@@ -43,6 +58,22 @@ export async function runAgent(
             },
         });
 
+        const reportTokenUsage = () => {
+            if (callbacks.onTokenUsage) {
+                const usage = estimateMessagesTokens(messages);
+                callbacks.onTokenUsage({
+                    inputTokens: usage.input,
+                    outputTokens: usage.output,
+                    totalTokens: usage.total,
+                    contextWindow: modelLimits.contextWindow,
+                    threshold: DEFAULT_THRESHOLD,
+                    percentage: calculateUsagePercentage(
+                        usage.total,
+                        modelLimits.contextWindow,
+                    ),
+                })
+            }
+        }
         const toolCalls: ToolCallInfo[] = [];
         let currentText = "";
         let streamError: Error | null = null;
@@ -79,11 +110,13 @@ export async function runAgent(
         if (finishReason != 'tool-calls' || toolCalls.length == 0) {
             const responseMessages = await result.response;
             messages.push(...responseMessages.messages);  // this can be added to in case you need to mod the convo history.
+            reportTokenUsage();
             break;
         }
 
         const responseMessages = await result.response;
         messages.push(...responseMessages.messages);
+        reportTokenUsage();
 
         for (const tc of toolCalls) {
             const result = await executeTool(tc.toolName, tc.args);
@@ -97,6 +130,7 @@ export async function runAgent(
                     output: { type: 'text', value: 'result'},
                 }],
             });
+            reportTokenUsage();
         }
     }
     callbacks.onComplete(fullResponse);

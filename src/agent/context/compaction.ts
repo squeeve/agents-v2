@@ -51,8 +51,10 @@ export async function compactConversation(
   const conversationText = messagesToText(conversationMessages);
 
   const { text: summary } = await generateText({
-    model: openai(model),
+    model: openai(model),   // eval the model to pick the best one.
     prompt: SUMMARIZATION_PROMPT + conversationText,
+    // equivalent to:
+    // messages: [{role: 'system', content: SUMMARIZATION_PROMPT}, {role: 'user', content: conversationText}]
   });
 
   // Create compacted messages
