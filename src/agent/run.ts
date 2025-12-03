@@ -4,7 +4,7 @@ import {streamText, uiMessageChunkSchema, type ModelMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';  
 import {getTracer, Laminar} from '@lmnr-ai/lmnr';
 import {tools} from './tools/index.ts';
-import {executeTools} from "./executeTool.ts";
+import {executeTool} from "./executeTool.ts";
 import { SYSTEM_PROMPT } from './system/prompt.ts';
 
 import type {AgentCallbacks, ToolCallInfo} from '../types.ts';
@@ -86,7 +86,7 @@ export async function runAgent(
         messages.push(...responseMessages.messages);
 
         for (const tc of toolCalls) {
-            const result = await executeTools(tc.toolName, tc.args);
+            const result = await executeTool(tc.toolName, tc.args);
             callbacks.onToolCallEnd(tc.toolName, result);
             messages.push({
                 role: "tool",

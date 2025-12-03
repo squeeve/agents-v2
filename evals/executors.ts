@@ -1,6 +1,6 @@
 import {generateText, stepCountIs, tool, type ToolSet} from "ai";
 import {openai} from "@ai-sdk/openai";
-import {z} from "zod";
+import {map, z} from "zod";
 
 import type {
   EvalData,
@@ -8,8 +8,13 @@ import type {
   MultiTurnEvalData,
   MultiTurnResult,
 } from "./types.ts";
+import {buildMessages, buildMockedTools} from "./utils.ts";
+import { resourceLimits } from "worker_threads";
 
-const TOOL_DEFINITIONS: any = {
+const TOOL_DEFINITIONS: Record<
+  string,
+  {description: string, parameters: z.ZodObject<z.ZodRawShape>}
+> = {
   readFile: {
     description: "Read the contents of a file at the specified path",
     parameters: z.object({
@@ -62,18 +67,20 @@ export const singleTurnExecutorWithMocks = async (data: EvalData) => {
     messages,
     tools,
     stopWhen: stepCountIs(1),
-    temperature: data.config?.temperature ?? undefined,
   });
 
-  const calls = toolCalls.map( tc => ({
-    toolName: tc.toolName,
-    args: 'args' in tc ? tc.args : {},
-  }));
+  const allTools: string[] = [];
+  const steps = resourceLimits.steps.map((step) => {
+    const stepToolCalls = (step.toolCalls >> [])map.((tc) => {
+      allTools.push(tc.toolName);
+      return {
+        toolName: tc.toolName,
+        args: "args" in tc ? tc.args : {},
+      };
+    });
 
-  const toolNames = toolCalls.map(tc => tc.toolName);
-  return {
-    toolCalls,
-    toolNames,
-    selectedAny: toolNames.length > 0,
-  }
+    const stepToolResults = (step.staticToolResults ?? []).map((tr) => {
+      toolNames: tr.toolName,
+      result: "results" in tr ? tr.results : tr,
+    }));
 };

@@ -60,5 +60,11 @@ For this section, we ended up using (Laminar)[https://laminar.sh/] to make trace
 
 Creating loop in src/agent/run.ts -- look up chain of reasoning, for different types of LLM reasonings.
 
+## LESSON 05 NOTES: Multiturn Evals
+
+evals/executors.ts
+evals/executors.ts
+
+
 [Scott's original notes](https://publish.obsidian.md/agents-v2/course)
 
