@@ -73,6 +73,15 @@ evals/executors.ts
 ## LESSON 06: File System Tools
 
 For enabling the agent to use system tools.
+I couldn't quite get it working. But changed up src/agent/tools/file.ts and src/agent/tools/index.ts
+
+## LESSON 07: Web Search Context Management
+
+Native vs. provider web search. Typically best to use commercial web search tool. This uses openai's webSearch.
+The concern is token/context limits.
+
+
+
 
 [Scott's original notes](https://publish.obsidian.md/agents-v2/course)
 
