@@ -78,8 +78,16 @@ I couldn't quite get it working. But changed up src/agent/tools/file.ts and src/
 ## LESSON 07: Web Search Context Management
 
 Native vs. provider web search. Typically best to use commercial web search tool. This uses openai's webSearch.
-The concern is token/context limits.
+The concern is token/context limits, which you can see in src/agent/context/modelLimits.ts and tokenEstimator.ts,
+as well as application in src/agent/run.ts
 
+
+## LESSON 08: 
+
+Giving the LLM the power to use system tools.
+Of note, Scott makes pretty clear that this is *not* the safe or secure way to do it. It's just an example of giving LLM access to the local system.
+
+Take a look at sandboxed options.
 
 
 
