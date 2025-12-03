@@ -7,7 +7,7 @@ import {
 } from "./evaluators.ts";
 import type { EvalData, EvalTarget } from "./types.ts";
 import dataset from "./data/file-tools.json" with { type: "json" };
-import { singleTurnExecutor } from "./executors.ts";
+import { singleTurnExecutorWithMocks} from "./executors.ts";
 
 /**
  * File Tools Selection Evaluation

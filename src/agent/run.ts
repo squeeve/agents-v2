@@ -1,12 +1,14 @@
 // import 'dotenv/config';
 
-import { generateText, stepCountIs, type ModelMessage } from 'ai';
+import {streamText, uiMessageChunkSchema, type ModelMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';  
 import {getTracer, Laminar} from '@lmnr-ai/lmnr';
 import {tools} from './tools/index.ts';
+import {executeTools} from "./executeTool.ts";
 import { SYSTEM_PROMPT } from './system/prompt.ts';
 
-import type {AgentCallbacks} from '../types.ts'
+import type {AgentCallbacks, ToolCallInfo} from '../types.ts';
+import {filterCompatibleMessages} from "./system/filterMessages.ts";
 
 const MODEL_NAME = "gpt-5-mini";
 Laminar.initialize({
@@ -17,24 +19,86 @@ export async function runAgent(
     userMessage: string,
     conversationHistory: ModelMessage[],
     callbacks: AgentCallbacks,
-): Promise<any> {
-    // Filter and check if we need to compact the conversation
+): Promise<ModelMessage[]> {
+    const workingHistory = filterCompatibleMessages(conversationHistory);
 
-    // The following call is actually what creates the agent.
-    const {text} = await generateText({
-        model: openai(MODEL_NAME),
-        prompt: userMessage,
-        system: SYSTEM_PROMPT,
-        tools,
-        experimental_telemetry: {
-            isEnabled: true,
-            tracer: getTracer(),
+    const messages: ModelMessage[] = [
+        {
+            role: "system",
+            content: SYSTEM_PROMPT
         },
-        stopWhen: stepCountIs(2),   // (1) didn't return the answer.
-    });
+            ...workingHistory,
+        {role: 'user', content: userMessage},
+    ];
 
-    await Laminar.flush();  // just in case you don't get any traces.
+    let fullResponse = "";
+    while (true) {
+        const result = streamText({
+            model: openai(MODEL_NAME),
+            messages,
+            tools,
+            experimental_telemetry: {
+                isEnabled: true,
+                tracer: getTracer(),
+            },
+        });
 
-    console.log(text);
-};
+        const toolCalls: ToolCallInfo[] = [];
+        let currentText = "";
+        let streamError: Error | null = null;
 
+        try {
+            for await (const chunk of result.fullStream) {
+                if (chunk.type === 'text-delta') {
+                    currentText += chunk.text;
+                    callbacks.onToken(chunk.text);
+                }     
+                if (chunk.type === 'tool-call') {
+                    const input = 'input' in chunk ? chunk.input : {}
+                    toolCalls.push({
+                        toolCallId: chunk.toolCallId,
+                        toolName: chunk.toolName,
+                        args: input as any,
+                    });
+                callbacks.onToolCallStart(chunk.toolName, input);
+                }
+            }
+        } catch(e) {
+            streamError = e as Error;
+            if (!currentText && !streamError.message.includes('No output generated')) {
+                throw streamError;
+            }
+        }
+        fullResponse += currentText;
+        if (streamError && !currentText) {
+            fullResponse = "Sorry about that; I'm working on it.";
+            callbacks.onToken(fullResponse);
+            break;
+        }
+        const finishReason = await result.finishReason;
+        if (finishReason != 'tool-calls' || toolCalls.length == 0) {
+            const responseMessages = await result.response;
+            messages.push(...responseMessages.messages);  // this can be added to in case you need to mod the convo history.
+            break;
+        }
+
+        const responseMessages = await result.response;
+        messages.push(...responseMessages.messages);
+
+        for (const tc of toolCalls) {
+            const result = await executeTools(tc.toolName, tc.args);
+            callbacks.onToolCallEnd(tc.toolName, result);
+            messages.push({
+                role: "tool",
+                content: [{
+                    type: 'tool-result',
+                    toolCallId: tc.toolCallId,
+                    toolName: tc.toolName,
+                    output: { type: 'text', value: 'result'},
+                }],
+            });
+        }
+    }
+    callbacks.onComplete(fullResponse);
+    return messages;
+}
